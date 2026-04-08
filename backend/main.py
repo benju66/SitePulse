@@ -61,7 +61,7 @@ def get_tasks(timeframe: str = "3weeks", db: Session = Depends(get_db)):
     return tasks
 
 @app.post("/api/v1/tasks/{task_id}/start")
-def start_task(task_id: str, db: Session = Depends(get_db)):
+def start_task(task_id: str, payload: schemas.TaskUpdateCreate, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -70,14 +70,14 @@ def start_task(task_id: str, db: Session = Depends(get_db)):
     update = models.TaskUpdate(
         task_id=task_id,
         status=models.UpdateStatus.pending,
-        requested_actual_start=datetime.datetime.utcnow()
+        requested_actual_start=payload.requested_actual_start or datetime.datetime.utcnow()
     )
     db.add(update)
     db.commit()
     return {"message": "Start update submitted for approval", "task_id": task_id}
 
 @app.post("/api/v1/tasks/{task_id}/finish")
-def finish_task(task_id: str, db: Session = Depends(get_db)):
+def finish_task(task_id: str, payload: schemas.TaskUpdateCreate, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -86,7 +86,7 @@ def finish_task(task_id: str, db: Session = Depends(get_db)):
     update = models.TaskUpdate(
         task_id=task_id,
         status=models.UpdateStatus.pending,
-        requested_actual_finish=datetime.datetime.utcnow(),
+        requested_actual_finish=payload.requested_actual_finish or datetime.datetime.utcnow(),
         requested_percent_complete=100
     )
     db.add(update)
@@ -115,6 +115,12 @@ def get_pending_updates(status: str = "pending", db: Session = Depends(get_db)):
     query_status = models.UpdateStatus(status)
     updates = db.query(models.TaskUpdate).filter(models.TaskUpdate.status == query_status).all()
     return updates
+
+@app.get("/api/v1/roadblocks", response_model=list[schemas.RoadblockResponse])
+def get_roadblocks(status: str = "active", db: Session = Depends(get_db)):
+    query_status = models.RoadblockStatus(status)
+    roadblocks = db.query(models.Roadblock).filter(models.Roadblock.status == query_status).all()
+    return roadblocks
 
 @app.post("/api/v1/updates/{update_id}/approve")
 def approve_update(update_id: str, db: Session = Depends(get_db)):

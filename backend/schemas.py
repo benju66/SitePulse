@@ -68,6 +68,7 @@ class RoadblockResponse(RoadblockCreate):
     task_id: str
     reported_at: datetime
     status: str
+    task: Task
 
     class Config:
         from_attributes = True

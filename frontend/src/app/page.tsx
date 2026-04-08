@@ -7,58 +7,72 @@ export default function Home() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Modal State
+  const [modalMode, setModalMode] = useState<'start' | 'finish' | 'roadblock' | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [roadblockCategory, setRoadblockCategory] = useState('Material');
+  const [roadblockNote, setRoadblockNote] = useState('');
+
+  const fetchTasks = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/tasks');
+      const data = await response.json();
+      setTasks(data);
+    } catch (error) {
+      console.error("Failed to fetch tasks:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/v1/tasks');
-        const data = await response.json();
-        setTasks(data);
-      } catch (error) {
-        console.error("Failed to fetch tasks:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchTasks();
   }, []);
 
-  const handleStart = async (id: string) => {
-    try {
-      await fetch(`http://localhost:8000/api/v1/tasks/${id}/start`, { method: 'POST' });
-      alert(`Started task ${id}`);
-    } catch (e) {
-      console.error(e);
-    }
+  const openModal = (mode: 'start' | 'finish' | 'roadblock', id: string) => {
+    setModalMode(mode);
+    setActiveTaskId(id);
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setRoadblockNote('');
   };
 
-  const handleFinish = async (id: string) => {
+  const submitAction = async () => {
     try {
-      await fetch(`http://localhost:8000/api/v1/tasks/${id}/finish`, { method: 'POST' });
-      setTasks(tasks.filter(t => t.id !== id));
-      alert(`Finished task ${id}`);
+      if (modalMode === 'start') {
+        await fetch(`http://localhost:8000/api/v1/tasks/${activeTaskId}/start`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requested_actual_start: new Date(selectedDate).toISOString() })
+        });
+        alert(`Started task on ${selectedDate}`);
+      } else if (modalMode === 'finish') {
+        await fetch(`http://localhost:8000/api/v1/tasks/${activeTaskId}/finish`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requested_actual_finish: new Date(selectedDate).toISOString() })
+        });
+        alert(`Finished task on ${selectedDate}`);
+        // Optionally remove task from list or just re-fetch
+        fetchTasks();
+      } else if (modalMode === 'roadblock') {
+        await fetch(`http://localhost:8000/api/v1/tasks/${activeTaskId}/roadblock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: roadblockCategory, note: roadblockNote })
+        });
+        alert(`Roadblock reported`);
+      }
     } catch (e) {
       console.error(e);
-    }
-  };
-
-  const handleRoadblock = async (id: string) => {
-    const category = prompt("Enter category (Weather, Material, Manpower, RFI):", "Material");
-    if (!category) return;
-    
-    try {
-      await fetch(`http://localhost:8000/api/v1/tasks/${id}/roadblock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, note: "Delayed by site conditions" })
-      });
-      alert(`Roadblock reported for ${id}`);
-    } catch (e) {
-      console.error(e);
+      alert("Action failed.");
+    } finally {
+      setModalMode(null);
     }
   };
 
   return (
-    <main className="min-h-screen bg-slate-900 font-sans text-slate-100 selection:bg-indigo-500/30 overflow-x-hidden">
+    <main className="min-h-screen bg-slate-900 font-sans text-slate-100 selection:bg-indigo-500/30 overflow-x-hidden relative">
       <div className="fixed inset-0 bg-[url('https://images.unsplash.com/photo-1541888081691-10c0e7fd1ebd?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center opacity-[0.03] mix-blend-screen pointer-events-none z-0"></div>
       
       <div className="relative max-w-md mx-auto py-6 px-4 z-10">
@@ -90,14 +104,14 @@ export default function Home() {
                   <TaskCard 
                     key={t.id} 
                     task={t} 
-                    onStart={handleStart} 
-                    onFinish={handleFinish} 
-                    onRoadblock={handleRoadblock} 
+                    onStart={(id) => openModal('start', id)} 
+                    onFinish={(id) => openModal('finish', id)} 
+                    onRoadblock={(id) => openModal('roadblock', id)} 
                   />
                 ))}
                 {tasks.length === 0 && (
                   <div className="text-center py-10 text-slate-500 font-medium">
-                    <p>All caught up! No tasks planned within the next 3 weeks.</p>
+                    <p>All caught up!</p>
                   </div>
                 )}
                 </>
@@ -105,6 +119,71 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Action Modal */}
+      {modalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700/50 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 className="text-xl font-bold mb-4">
+              {modalMode === 'start' ? 'Start Task' : modalMode === 'finish' ? 'Finish Task' : 'Report Roadblock'}
+            </h3>
+            
+            {(modalMode === 'start' || modalMode === 'finish') && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-400 mb-2">Select Actual Date</label>
+                <input 
+                  type="date" 
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                />
+              </div>
+            )}
+
+            {modalMode === 'roadblock' && (
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Category</label>
+                  <select 
+                    value={roadblockCategory} 
+                    onChange={(e) => setRoadblockCategory(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  >
+                    <option value="Weather">Weather</option>
+                    <option value="Material">Material</option>
+                    <option value="Manpower">Manpower</option>
+                    <option value="RFI">RFI</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Comment/Note</label>
+                  <textarea 
+                    value={roadblockNote}
+                    onChange={(e) => setRoadblockNote(e.target.value)}
+                    placeholder="E.g., Sub didn't show up."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500 h-24 resize-none"
+                  ></textarea>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setModalMode(null)}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 font-bold py-3 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={submitAction}
+                className={`flex-1 font-bold py-3 rounded-xl transition-colors text-white ${modalMode === 'roadblock' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
