@@ -59,9 +59,14 @@ def start_task(task_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task not found")
     
     import datetime
-    task.actual_start = datetime.datetime.utcnow()
+    update = models.TaskUpdate(
+        task_id=task_id,
+        status=models.UpdateStatus.pending,
+        requested_actual_start=datetime.datetime.utcnow()
+    )
+    db.add(update)
     db.commit()
-    return {"message": "Task started", "task_id": task_id}
+    return {"message": "Start update submitted for approval", "task_id": task_id}
 
 @app.post("/api/v1/tasks/{task_id}/finish")
 def finish_task(task_id: str, db: Session = Depends(get_db)):
@@ -70,7 +75,61 @@ def finish_task(task_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task not found")
     
     import datetime
-    task.actual_finish = datetime.datetime.utcnow()
-    task.percent_complete = 100
+    update = models.TaskUpdate(
+        task_id=task_id,
+        status=models.UpdateStatus.pending,
+        requested_actual_finish=datetime.datetime.utcnow(),
+        requested_percent_complete=100
+    )
+    db.add(update)
     db.commit()
-    return {"message": "Task finished", "task_id": task_id}
+    return {"message": "Finish update submitted for approval", "task_id": task_id}
+
+@app.post("/api/v1/tasks/{task_id}/roadblock")
+def report_roadblock(task_id: str, roadblock_data: schemas.RoadblockCreate, db: Session = Depends(get_db)):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    roadblock = models.Roadblock(
+        task_id=task_id,
+        category=roadblock_data.category,
+        note=roadblock_data.note,
+        photo_url=roadblock_data.photo_url
+    )
+    db.add(roadblock)
+    db.commit()
+    return {"message": "Roadblock reported successfully"}
+
+@app.get("/api/v1/updates", response_model=list[schemas.TaskUpdateResponse])
+def get_pending_updates(status: str = "pending", db: Session = Depends(get_db)):
+    # Assuming user fetches pending status by default
+    query_status = models.UpdateStatus(status)
+    updates = db.query(models.TaskUpdate).filter(models.TaskUpdate.status == query_status).all()
+    return updates
+
+@app.post("/api/v1/updates/{update_id}/approve")
+def approve_update(update_id: str, db: Session = Depends(get_db)):
+    import datetime
+    update = db.query(models.TaskUpdate).filter(models.TaskUpdate.id == update_id).first()
+    if not update:
+        raise HTTPException(status_code=404, detail="Update not found")
+    
+    if update.status != models.UpdateStatus.pending:
+        raise HTTPException(status_code=400, detail="Update is not pending")
+        
+    task = db.query(models.Task).filter(models.Task.id == update.task_id).first()
+    
+    # Apply changes
+    if update.requested_actual_start:
+        task.actual_start = update.requested_actual_start
+    if update.requested_actual_finish:
+        task.actual_finish = update.requested_actual_finish
+    if update.requested_percent_complete is not None:
+        task.percent_complete = update.requested_percent_complete
+        
+    update.status = models.UpdateStatus.approved
+    update.approved_at = datetime.datetime.utcnow()
+    
+    db.commit()
+    return {"message": "Update approved"}

@@ -45,7 +45,29 @@ class TaskUpdateCreate(BaseModel):
     requested_actual_finish: Optional[datetime] = None
     requested_percent_complete: Optional[int] = None
 
+class TaskUpdateResponse(BaseModel):
+    id: str
+    task_id: str
+    status: str
+    requested_actual_start: Optional[datetime] = None
+    requested_actual_finish: Optional[datetime] = None
+    requested_percent_complete: Optional[int] = None
+    submitted_at: datetime
+    task: Task
+
+    class Config:
+        from_attributes = True
+
 class RoadblockCreate(BaseModel):
     category: str
     note: Optional[str] = None
     photo_url: Optional[str] = None
+
+class RoadblockResponse(RoadblockCreate):
+    id: str
+    task_id: str
+    reported_at: datetime
+    status: str
+
+    class Config:
+        from_attributes = True

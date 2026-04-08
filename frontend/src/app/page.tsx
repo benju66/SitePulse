@@ -41,8 +41,20 @@ export default function Home() {
     }
   };
 
-  const handleRoadblock = (id: string) => {
-    alert(`Roadblock reported for ${id}`);
+  const handleRoadblock = async (id: string) => {
+    const category = prompt("Enter category (Weather, Material, Manpower, RFI):", "Material");
+    if (!category) return;
+    
+    try {
+      await fetch(`http://localhost:8000/api/v1/tasks/${id}/roadblock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, note: "Delayed by site conditions" })
+      });
+      alert(`Roadblock reported for ${id}`);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
