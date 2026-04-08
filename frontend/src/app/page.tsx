@@ -1,37 +1,44 @@
 'use client';
 import { TaskCard } from '@/components/TaskCard';
 import { GamificationStats } from '@/components/GamificationStats';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
-  const [tasks, setTasks] = useState([
-    {
-      id: "1",
-      wbs_code: "SITE-01",
-      name: "Excavate Foundations",
-      planned_start: "2026-04-10T08:00:00.000Z",
-      planned_finish: "2026-04-14T17:00:00.000Z",
-      is_critical_path: true,
-      percent_complete: 0,
-    },
-    {
-      id: "2",
-      wbs_code: "SITE-02",
-      name: "Pour Concrete Footers",
-      planned_start: "2026-04-15T08:00:00.000Z",
-      planned_finish: "2026-04-18T17:00:00.000Z",
-      is_critical_path: false,
-      percent_complete: 0,
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/v1/tasks');
+        const data = await response.json();
+        setTasks(data);
+      } catch (error) {
+        console.error("Failed to fetch tasks:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTasks();
+  }, []);
+
+  const handleStart = async (id: string) => {
+    try {
+      await fetch(`http://localhost:8000/api/v1/tasks/${id}/start`, { method: 'POST' });
+      alert(`Started task ${id}`);
+    } catch (e) {
+      console.error(e);
     }
-  ]);
-  
-  const handleStart = (id: string) => {
-    alert(`Started task ${id}`);
   };
 
-  const handleFinish = (id: string) => {
-    setTasks(tasks.filter(t => t.id !== id));
-    alert(`Finished task ${id}`);
+  const handleFinish = async (id: string) => {
+    try {
+      await fetch(`http://localhost:8000/api/v1/tasks/${id}/finish`, { method: 'POST' });
+      setTasks(tasks.filter(t => t.id !== id));
+      alert(`Finished task ${id}`);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleRoadblock = (id: string) => {
@@ -63,19 +70,25 @@ export default function Home() {
             </span>
           </div>
           <div className="px-2 space-y-4">
-            {tasks.map(t => (
-              <TaskCard 
-                key={t.id} 
-                task={t} 
-                onStart={handleStart} 
-                onFinish={handleFinish} 
-                onRoadblock={handleRoadblock} 
-              />
-            ))}
-            {tasks.length === 0 && (
-              <div className="text-center py-10 text-slate-500 font-medium">
-                <p>All caught up!</p>
-              </div>
+            {loading ? (
+              <div className="text-center py-10 text-slate-500 font-medium animate-pulse">Loading Tasks...</div>
+            ) : (
+                <>
+                {tasks.map(t => (
+                  <TaskCard 
+                    key={t.id} 
+                    task={t} 
+                    onStart={handleStart} 
+                    onFinish={handleFinish} 
+                    onRoadblock={handleRoadblock} 
+                  />
+                ))}
+                {tasks.length === 0 && (
+                  <div className="text-center py-10 text-slate-500 font-medium">
+                    <p>All caught up! No tasks planned within the next 3 weeks.</p>
+                  </div>
+                )}
+                </>
             )}
           </div>
         </div>

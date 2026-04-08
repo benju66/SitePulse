@@ -39,7 +39,17 @@ async def upload_project_xml(file: UploadFile = File(...), db: Session = Depends
 
 @app.get("/api/v1/tasks", response_model=list[schemas.Task])
 def get_tasks(timeframe: str = "3weeks", db: Session = Depends(get_db)):
-    tasks = db.query(models.Task).all()
+    import datetime
+    # We will use simple start date bounding for actionable tasks
+    today = datetime.datetime.utcnow().replace(tzinfo=None)
+    three_weeks = today + datetime.timedelta(days=21)
+    
+    tasks = db.query(models.Task).filter(
+        models.Task.planned_start.isnot(None),
+        models.Task.planned_start <= three_weeks,
+        models.Task.planned_finish >= today
+    ).order_by(models.Task.planned_start.asc()).all()
+    
     return tasks
 
 @app.post("/api/v1/tasks/{task_id}/start")
