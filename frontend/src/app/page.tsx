@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 
 export default function Home() {
   const [tasks, setTasks] = useState<any[]>([]);
+  const [pendingUpdates, setPendingUpdates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal State
@@ -14,20 +15,23 @@ export default function Home() {
   const [roadblockCategory, setRoadblockCategory] = useState('Material');
   const [roadblockNote, setRoadblockNote] = useState('');
 
-  const fetchTasks = async () => {
+  const fetchTasksAndUpdates = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/tasks');
-      const data = await response.json();
-      setTasks(data);
+      const [tasksRes, updatesRes] = await Promise.all([
+        fetch('http://localhost:8000/api/v1/tasks'),
+        fetch('http://localhost:8000/api/v1/updates?status=pending')
+      ]);
+      setTasks(await tasksRes.json());
+      setPendingUpdates(await updatesRes.json());
     } catch (error) {
-      console.error("Failed to fetch tasks:", error);
+      console.error("Failed to fetch tasks and updates:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTasks();
+    fetchTasksAndUpdates();
   }, []);
 
   const openModal = (mode: 'start' | 'finish' | 'roadblock', id: string) => {
@@ -53,8 +57,6 @@ export default function Home() {
             body: JSON.stringify({ requested_actual_finish: new Date(selectedDate).toISOString() })
         });
         alert(`Finished task on ${selectedDate}`);
-        // Optionally remove task from list or just re-fetch
-        fetchTasks();
       } else if (modalMode === 'roadblock') {
         await fetch(`http://localhost:8000/api/v1/tasks/${activeTaskId}/roadblock`, {
           method: 'POST',
@@ -63,11 +65,23 @@ export default function Home() {
         });
         alert(`Roadblock reported`);
       }
+      fetchTasksAndUpdates();
     } catch (e) {
       console.error(e);
       alert("Action failed.");
     } finally {
       setModalMode(null);
+    }
+  };
+
+  const handleRecall = async (id: string) => {
+    try {
+      await fetch(`http://localhost:8000/api/v1/updates/${id}`, { method: 'DELETE' });
+      alert("Update recalled.");
+      fetchTasksAndUpdates();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to recall update.");
     }
   };
 
@@ -118,6 +132,35 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {pendingUpdates.length > 0 && (
+          <div className="mb-8 pt-1 px-1 pb-4 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/10 shadow-2xl">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-white/5 mb-2">
+              <h2 className="text-xl font-bold">Pending Approvals</h2>
+            </div>
+            <div className="px-2 space-y-4">
+              {pendingUpdates.map(u => {
+                const type = u.requested_actual_start ? 'Started' : 'Finished';
+                const date = u.requested_actual_start || u.requested_actual_finish;
+                return (
+                  <div key={u.id} className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 flex flex-col gap-3">
+                    <div>
+                      <h3 className="font-bold text-slate-200">{u.task?.name || 'Task'}</h3>
+                      <p className="text-slate-400 text-sm mt-1">{type} submitted for {new Date(date).toLocaleDateString()}</p>
+                    </div>
+                    <button 
+                      onClick={() => handleRecall(u.id)}
+                      className="w-full bg-slate-700 hover:bg-rose-600/80 text-white font-bold py-2 rounded-lg transition-colors border border-slate-600 hover:border-rose-500/50"
+                    >
+                      Undo Request
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Action Modal */}

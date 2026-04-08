@@ -48,14 +48,17 @@ async def upload_project_xml(file: UploadFile = File(...), db: Session = Depends
 @app.get("/api/v1/tasks", response_model=list[schemas.Task])
 def get_tasks(timeframe: str = "3weeks", db: Session = Depends(get_db)):
     import datetime
-    # We will use simple start date bounding for actionable tasks
     today = datetime.datetime.utcnow().replace(tzinfo=None)
     three_weeks = today + datetime.timedelta(days=21)
+    
+    pending_updates = db.query(models.TaskUpdate.task_id).filter(models.TaskUpdate.status == models.UpdateStatus.pending).all()
+    pending_task_ids = [pu.task_id for pu in pending_updates]
     
     tasks = db.query(models.Task).filter(
         models.Task.planned_start.isnot(None),
         models.Task.planned_start <= three_weeks,
-        models.Task.planned_finish >= today
+        models.Task.planned_finish >= today,
+        ~models.Task.id.in_(pending_task_ids)
     ).order_by(models.Task.planned_start.asc()).all()
     
     return tasks
@@ -147,6 +150,27 @@ def approve_update(update_id: str, db: Session = Depends(get_db)):
     
     db.commit()
     return {"message": "Update approved"}
+
+@app.post("/api/v1/updates/{update_id}/reject")
+def reject_update(update_id: str, payload: schemas.TaskUpdateReject, db: Session = Depends(get_db)):
+    update = db.query(models.TaskUpdate).filter(models.TaskUpdate.id == update_id).first()
+    if not update:
+        raise HTTPException(status_code=404, detail="Update not found")
+        
+    update.status = models.UpdateStatus.rejected
+    update.rejection_note = payload.rejection_note
+    db.commit()
+    return {"message": "Update rejected"}
+
+@app.delete("/api/v1/updates/{update_id}")
+def delete_update(update_id: str, db: Session = Depends(get_db)):
+    update = db.query(models.TaskUpdate).filter(models.TaskUpdate.id == update_id).first()
+    if not update:
+        raise HTTPException(status_code=404, detail="Update not found")
+    
+    db.delete(update)
+    db.commit()
+    return {"message": "Update successfully recalled"}
 
 @app.get("/api/v1/projects/export")
 def export_project_xml(db: Session = Depends(get_db)):

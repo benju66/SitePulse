@@ -95,6 +95,7 @@ class TaskUpdate(Base):
     requested_percent_complete = Column(Integer, nullable=True)
     submitted_at = Column(DateTime, default=datetime.datetime.utcnow)
     approved_at = Column(DateTime, nullable=True)
+    rejection_note = Column(String, nullable=True)
 
     task = relationship("Task", back_populates="updates")
     user = relationship("User")

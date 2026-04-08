@@ -45,6 +45,9 @@ class TaskUpdateCreate(BaseModel):
     requested_actual_finish: Optional[datetime] = None
     requested_percent_complete: Optional[int] = None
 
+class TaskUpdateReject(BaseModel):
+    rejection_note: str
+
 class TaskUpdateResponse(BaseModel):
     id: str
     task_id: str
@@ -53,6 +56,7 @@ class TaskUpdateResponse(BaseModel):
     requested_actual_finish: Optional[datetime] = None
     requested_percent_complete: Optional[int] = None
     submitted_at: datetime
+    rejection_note: Optional[str] = None
     task: Task
 
     class Config:

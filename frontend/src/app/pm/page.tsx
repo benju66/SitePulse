@@ -7,6 +7,10 @@ export default function PMDashboard() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectActiveId, setRejectActiveId] = useState('');
+  const [rejectNote, setRejectNote] = useState('');
+
   const fetchUpdates = async () => {
     try {
       const [updatesRes, roadblocksRes] = await Promise.all([
@@ -22,6 +26,28 @@ export default function PMDashboard() {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openRejectModal = (id: string) => {
+    setRejectActiveId(id);
+    setRejectNote('');
+    setRejectModalOpen(true);
+  };
+
+  const submitReject = async () => {
+    try {
+      await fetch(`http://localhost:8000/api/v1/updates/${rejectActiveId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejection_note: rejectNote })
+      });
+      setUpdates(updates.filter(u => u.id !== rejectActiveId));
+      alert('Update rejected successfully.');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRejectModalOpen(false);
     }
   };
 
@@ -172,7 +198,10 @@ export default function PMDashboard() {
                   </div>
                   
                   <div className="flex gap-3">
-                    <button className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                    <button 
+                      onClick={() => openRejectModal(u.id)}
+                      className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
                       Reject
                     </button>
                     <button 
@@ -221,6 +250,37 @@ export default function PMDashboard() {
         )}
 
       </div>
+
+      {rejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-xl font-bold mb-4 text-slate-800">Reject Update</h3>
+            <p className="text-sm text-slate-500 mb-4">Please provide a reason for rejecting this update so the field staff knows what needs correction.</p>
+            <div className="mb-6">
+              <textarea 
+                value={rejectNote}
+                onChange={(e) => setRejectNote(e.target.value)}
+                placeholder="E.g., Date seems incorrect, please recount."
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500 h-24 resize-none"
+              ></textarea>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setRejectModalOpen(false)}
+                className="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold py-3 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={submitReject}
+                className="flex-1 font-bold py-3 rounded-xl transition-colors text-white bg-rose-600 hover:bg-rose-700"
+              >
+                Submit Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
