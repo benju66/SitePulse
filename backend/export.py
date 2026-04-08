@@ -5,13 +5,20 @@ import datetime
 
 def generate_updated_xml(project_id: str, db: Session) -> bytes:
     project = db.query(models.Project).filter(models.Project.id == project_id).first()
-    if not project or not project.raw_xml_content:
-        raise ValueError("Project or original XML not found.")
+    if not project or not project.mpp_file_path:
+        raise ValueError("Project or original XML file path not found.")
+
+    import os
+    if not os.path.exists(project.mpp_file_path):
+        raise ValueError("Original XML file is missing from server storage.")
+
+    with open(project.mpp_file_path, "rb") as f:
+        xml_content = f.read()
 
     ET.register_namespace('', 'http://schemas.microsoft.com/project')
     ns = {'ns': 'http://schemas.microsoft.com/project'}
     
-    root = ET.fromstring(project.raw_xml_content)
+    root = ET.fromstring(xml_content.decode('utf-8'))
     
     # Pre-load tasks from db that have actuals
     tasks = db.query(models.Task).filter(

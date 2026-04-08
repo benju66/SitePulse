@@ -31,8 +31,15 @@ async def upload_project_xml(file: UploadFile = File(...), db: Session = Depends
     
     contents = await file.read()
     
+    import os
+    import uuid
+    os.makedirs("uploads", exist_ok=True)
+    file_path = f"uploads/{uuid.uuid4()}_{file.filename}"
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
     try:
-        project_id = ingestion.parse_and_store_ms_project_xml(contents, file.filename, db)
+        project_id = ingestion.parse_and_store_ms_project_xml(file_path, file.filename, db)
         return {"message": "Project parsed and saved successfully.", "project_id": project_id}
     except Exception as e:
         db.rollback()

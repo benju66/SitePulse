@@ -3,7 +3,10 @@ import models
 from sqlalchemy.orm import Session
 import datetime
 
-def parse_and_store_ms_project_xml(xml_content: bytes, filename: str, db: Session) -> str:
+def parse_and_store_ms_project_xml(file_path: str, filename: str, db: Session) -> str:
+    with open(file_path, "rb") as f:
+        xml_content = f.read()
+
     # MS Project XML namespace
     ns = {'ns': 'http://schemas.microsoft.com/project'}
     
@@ -11,7 +14,7 @@ def parse_and_store_ms_project_xml(xml_content: bytes, filename: str, db: Sessio
     
     project = models.Project(
         name=filename.replace('.xml', ''),
-        mpp_file_path=filename,
+        mpp_file_path=file_path,
         raw_xml_content=xml_content.decode('utf-8')
     )
     db.add(project)
