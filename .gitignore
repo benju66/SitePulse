@@ -43,3 +43,7 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
+
+# Databases
+*.db
+*.sqlite3

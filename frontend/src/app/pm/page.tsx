@@ -11,6 +11,20 @@ export default function PMDashboard() {
   const [rejectActiveId, setRejectActiveId] = useState('');
   const [rejectNote, setRejectNote] = useState('');
 
+  const parseCategory = (name: string) => {
+    const match = name.match(/^\[(.*?)\]\s*(.*)$/);
+    return match ? { category: match[1], cleanName: match[2] } : { category: 'General', cleanName: name };
+  };
+
+  const groupUpdates = (updatesList: any[]) => {
+    return updatesList.reduce((acc, u) => {
+      const { category } = parseCategory(u.task?.name || '');
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(u);
+      return acc;
+    }, {} as Record<string, any[]>);
+  };
+
   const fetchUpdates = async () => {
     try {
       const [updatesRes, roadblocksRes] = await Promise.all([
@@ -167,53 +181,61 @@ export default function PMDashboard() {
              <p className="text-slate-500">All field updates have been approved and synced.</p>
            </div>
         ) : (
-          <div className="grid gap-4">
-            {updates.map((u) => {
-              const task = u.task;
-              const type = u.requested_actual_start ? 'Started' : 'Finished';
-              const date = u.requested_actual_start || u.requested_actual_finish;
-              const isDelayed = type === 'Finished' && task.planned_finish && new Date(date) > new Date(task.planned_finish);
-              
-              return (
-                <div key={u.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-[0_2px_10px_rgb(0,0,0,0.04)] flex items-center justify-between hover:shadow-md transition-shadow">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${type === 'Started' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {type}
-                      </span>
-                      <span className="text-slate-400 text-sm font-semibold">{task.wbs_code || 'WBS'}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800">{task.name}</h3>
-                    <div className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-                      Submitted Actual {type}: 
-                      <span className={`font-bold ${isDelayed ? 'text-red-500' : 'text-slate-700'}`}>
-                        {new Date(date).toLocaleString()}
-                      </span>
-                      {isDelayed && (
-                        <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                          Delayed
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={() => openRejectModal(u.id)}
-                      className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      Reject
-                    </button>
-                    <button 
-                      onClick={() => handleApprove(u.id)}
-                      className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white text-sm font-bold shadow-md transition-colors"
-                    >
-                      Approve Sync
-                    </button>
-                  </div>
+          <div className="space-y-8">
+            {Object.entries(groupUpdates(updates)).map(([cat, updatesInCat]) => (
+              <div key={cat}>
+                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest pl-4 mb-3 border-l-2 border-slate-300">{cat}</h3>
+                <div className="grid gap-4">
+                  {(updatesInCat as any[]).map((u: any) => {
+                    const task = u.task;
+                    const { cleanName } = parseCategory(task.name || '');
+                    const type = u.requested_actual_start ? 'Started' : 'Finished';
+                    const date = u.requested_actual_start || u.requested_actual_finish;
+                    const isDelayed = type === 'Finished' && task.planned_finish && new Date(date) > new Date(task.planned_finish);
+                    
+                    return (
+                      <div key={u.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-[0_2px_10px_rgb(0,0,0,0.04)] flex items-center justify-between hover:shadow-md transition-shadow">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${type === 'Started' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {type}
+                            </span>
+                            <span className="text-slate-400 text-sm font-semibold">{task.wbs_code || 'WBS'}</span>
+                          </div>
+                          <h3 className="text-lg font-bold text-slate-800">{cleanName}</h3>
+                          <div className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                            Submitted Actual {type}: 
+                            <span className={`font-bold ${isDelayed ? 'text-red-500' : 'text-slate-700'}`}>
+                              {new Date(date).toLocaleString()}
+                            </span>
+                            {isDelayed && (
+                              <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                                Delayed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={() => openRejectModal(u.id)}
+                            className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                          >
+                            Reject
+                          </button>
+                          <button 
+                            onClick={() => handleApprove(u.id)}
+                            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white text-sm font-bold shadow-md transition-colors"
+                          >
+                            Approve Sync
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
 

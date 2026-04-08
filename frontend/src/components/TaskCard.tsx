@@ -5,23 +5,33 @@ interface TaskCardProps {
     onStart: (id: string) => void;
     onFinish: (id: string) => void;
     onRoadblock: (id: string) => void;
+    cleanName?: string;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, onStart, onFinish, onRoadblock }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, onStart, onFinish, onRoadblock, cleanName }) => {
+    const isOverdue = new Date() > new Date(task.planned_finish);
+    const borderColor = isOverdue ? "border-red-500/50" : "border-white/20";
+    const bgColor = isOverdue ? "bg-red-500/10" : "bg-white/10";
+
     return (
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] text-white w-full mb-4 transition-transform hover:scale-[1.02]">
+        <div className={`${bgColor} backdrop-blur-lg border ${borderColor} p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] text-white w-full mb-4 transition-transform hover:scale-[1.02]`}>
             <div className="flex justify-between items-start mb-3">
                 <span className="bg-white/10 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider text-green-300">
                     {task.wbs_code || "WBS-XX"}
                 </span>
+                {isOverdue && (
+                    <span className="ml-2 bg-red-600 text-white border border-red-400 px-3 py-1 rounded-full text-xs font-bold shadow-[0_0_10px_rgb(239,68,68,0.5)]">
+                        LATE
+                    </span>
+                )}
                 {task.is_critical_path && (
-                    <span className="bg-red-500/20 text-red-300 border border-red-500/30 px-3 py-1 rounded-full text-xs font-bold shadow-lg animate-pulse">
+                    <span className="bg-orange-500/20 text-orange-300 border border-orange-500/30 px-3 py-1 rounded-full text-xs font-bold shadow-lg animate-pulse ml-2">
                         CRITICAL
                     </span>
                 )}
             </div>
             
-            <h3 className="text-xl font-bold mb-4 leading-tight">{task.name}</h3>
+            <h3 className="text-xl font-bold mb-4 leading-tight">{cleanName || task.name}</h3>
             
             <div className="grid grid-cols-2 gap-3 mb-6 text-sm text-gray-300">
                 <div className="bg-black/20 p-3 rounded-2xl flex flex-col items-center justify-center">

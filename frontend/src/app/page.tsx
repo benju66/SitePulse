@@ -6,7 +6,22 @@ import { useState, useEffect } from 'react';
 export default function Home() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [pendingUpdates, setPendingUpdates] = useState<any[]>([]);
+  const [rejectedUpdates, setRejectedUpdates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const parseCategory = (name: string) => {
+    const match = name.match(/^\[(.*?)\]\s*(.*)$/);
+    return match ? { category: match[1], cleanName: match[2] } : { category: 'General', cleanName: name };
+  };
+
+  const groupTasks = (tasksList: any[]) => {
+    return tasksList.reduce((acc, t) => {
+      const { category } = parseCategory(t.name || '');
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(t);
+      return acc;
+    }, {} as Record<string, any[]>);
+  };
 
   // Modal State
   const [modalMode, setModalMode] = useState<'start' | 'finish' | 'roadblock' | null>(null);
@@ -17,12 +32,14 @@ export default function Home() {
 
   const fetchTasksAndUpdates = async () => {
     try {
-      const [tasksRes, updatesRes] = await Promise.all([
+      const [tasksRes, updatesRes, rejectedRes] = await Promise.all([
         fetch('http://localhost:8000/api/v1/tasks'),
-        fetch('http://localhost:8000/api/v1/updates?status=pending')
+        fetch('http://localhost:8000/api/v1/updates?status=pending'),
+        fetch('http://localhost:8000/api/v1/updates?status=rejected')
       ]);
       setTasks(await tasksRes.json());
       setPendingUpdates(await updatesRes.json());
+      setRejectedUpdates(await rejectedRes.json());
     } catch (error) {
       console.error("Failed to fetch tasks and updates:", error);
     } finally {
@@ -102,6 +119,37 @@ export default function Home() {
 
         <GamificationStats score={94} streak={12} />
 
+        {rejectedUpdates.length > 0 && (
+          <div className="mb-8 pt-1 px-1 pb-4 rounded-[2rem] bg-rose-500/10 backdrop-blur-2xl border border-rose-500/20 shadow-2xl">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-rose-500/20 mb-2">
+              <h2 className="text-xl font-bold text-rose-100 flex items-center gap-2">
+                 <svg className="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                 Action Required
+              </h2>
+            </div>
+            <div className="px-2 space-y-4">
+              {rejectedUpdates.map(u => {
+                const { cleanName } = parseCategory(u.task?.name || '');
+                return (
+                  <div key={u.id} className="bg-slate-800/80 p-4 rounded-xl border border-rose-500/50 flex flex-col gap-3">
+                    <div>
+                      <span className="text-xs bg-rose-500/20 text-rose-300 font-bold px-2 py-1 rounded inline-block mb-2">REJECTED BY PM</span>
+                      <h3 className="font-bold text-slate-200">{cleanName}</h3>
+                      <p className="text-rose-200 text-sm mt-3 bg-rose-950/50 p-3 rounded-lg border border-rose-500/20">"{u.rejection_note || 'No reason provided.'}"</p>
+                    </div>
+                    <button 
+                      onClick={() => openModal(u.requested_actual_start ? 'start' : 'finish', u.task_id)}
+                      className="w-full bg-slate-700 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg transition-colors border border-slate-600"
+                    >
+                      Resubmit Dates
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mb-8 pt-1 px-1 pb-4 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/10 shadow-2xl">
           <div className="flex justify-between items-center px-5 py-4 border-b border-white/5 mb-2">
             <h2 className="text-xl font-bold">Today & Next</h2>
@@ -109,25 +157,33 @@ export default function Home() {
               3 WEEKS OUT
             </span>
           </div>
-          <div className="px-2 space-y-4">
+          <div className="px-2 space-y-4 pb-2">
             {loading ? (
               <div className="text-center py-10 text-slate-500 font-medium animate-pulse">Loading Tasks...</div>
+            ) : Object.keys(groupTasks(tasks)).length === 0 ? (
+              <div className="text-center py-10 text-slate-500 font-medium">All caught up!</div>
             ) : (
                 <>
-                {tasks.map(t => (
-                  <TaskCard 
-                    key={t.id} 
-                    task={t} 
-                    onStart={(id) => openModal('start', id)} 
-                    onFinish={(id) => openModal('finish', id)} 
-                    onRoadblock={(id) => openModal('roadblock', id)} 
-                  />
-                ))}
-                {tasks.length === 0 && (
-                  <div className="text-center py-10 text-slate-500 font-medium">
-                    <p>All caught up!</p>
+                {Object.entries(groupTasks(tasks)).map(([cat, tasksInCat]) => (
+                  <div key={cat} className="mb-6">
+                    <h3 className="text-sm font-black text-indigo-300 uppercase tracking-widest pl-4 mb-3 border-l-2 border-indigo-400">{cat}</h3>
+                    <div className="space-y-4">
+                      {(tasksInCat as any[]).map((t: any) => {
+                        const { cleanName } = parseCategory(t.name);
+                        return (
+                          <TaskCard 
+                            key={t.id} 
+                            task={t} 
+                            cleanName={cleanName}
+                            onStart={(id) => openModal('start', id)} 
+                            onFinish={(id) => openModal('finish', id)} 
+                            onRoadblock={(id) => openModal('roadblock', id)} 
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
+                ))}
                 </>
             )}
           </div>
