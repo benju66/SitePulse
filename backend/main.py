@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
@@ -133,3 +134,18 @@ def approve_update(update_id: str, db: Session = Depends(get_db)):
     
     db.commit()
     return {"message": "Update approved"}
+
+@app.get("/api/v1/projects/export")
+def export_project_xml(db: Session = Depends(get_db)):
+    project = db.query(models.Project).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="No projects found.")
+
+    import export
+    try:
+        xml_bytes = export.generate_updated_xml(project.id, db)
+        return Response(content=xml_bytes, media_type="application/xml", headers={
+            "Content-Disposition": f"attachment; filename=updated_{project.name}.xml"
+        })
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

@@ -31,6 +31,10 @@ export default function PMDashboard() {
     }
   };
 
+  const handleExport = () => {
+    window.location.href = 'http://localhost:8000/api/v1/projects/export';
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 font-sans">
       {/* Header */}
@@ -40,7 +44,14 @@ export default function PMDashboard() {
           <p className="text-slate-500 font-semibold text-sm">Master Schedule Control</p>
         </div>
         <div className="flex gap-4 items-center">
-          <div className="text-right">
+          <button 
+            onClick={handleExport}
+            className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-100 flex items-center gap-2 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export Updated Schedule (XML)
+          </button>
+          <div className="text-right ml-4">
             <p className="font-bold text-sm tracking-wide">PM User</p>
             <p className="text-emerald-500 text-xs font-bold uppercase tracking-wider">Online</p>
           </div>
@@ -71,6 +82,7 @@ export default function PMDashboard() {
               const task = u.task;
               const type = u.requested_actual_start ? 'Started' : 'Finished';
               const date = u.requested_actual_start || u.requested_actual_finish;
+              const isDelayed = type === 'Finished' && task.planned_finish && new Date(date) > new Date(task.planned_finish);
               
               return (
                 <div key={u.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-[0_2px_10px_rgb(0,0,0,0.04)] flex items-center justify-between hover:shadow-md transition-shadow">
@@ -82,8 +94,16 @@ export default function PMDashboard() {
                       <span className="text-slate-400 text-sm font-semibold">{task.wbs_code || 'WBS'}</span>
                     </div>
                     <h3 className="text-lg font-bold text-slate-800">{task.name}</h3>
-                    <div className="text-sm text-slate-500 mt-1">
-                      Submitted Actual {type}: <span className="font-bold text-slate-700">{new Date(date).toLocaleString()}</span>
+                    <div className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                      Submitted Actual {type}: 
+                      <span className={`font-bold ${isDelayed ? 'text-red-500' : 'text-slate-700'}`}>
+                        {new Date(date).toLocaleString()}
+                      </span>
+                      {isDelayed && (
+                        <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                          Delayed
+                        </span>
+                      )}
                     </div>
                   </div>
                   

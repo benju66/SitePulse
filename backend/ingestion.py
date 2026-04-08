@@ -11,7 +11,8 @@ def parse_and_store_ms_project_xml(xml_content: bytes, filename: str, db: Sessio
     
     project = models.Project(
         name=filename.replace('.xml', ''),
-        mpp_file_path=filename
+        mpp_file_path=filename,
+        raw_xml_content=xml_content.decode('utf-8')
     )
     db.add(project)
     db.flush()

@@ -37,7 +37,8 @@ class Project(Base):
     __tablename__ = "projects"
     id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String, nullable=False)
-    mpp_file_path = Column(String, nullable=True) # or XML path
+    mpp_file_path = Column(String, nullable=True)
+    raw_xml_content = Column(String, nullable=True)
     start_date = Column(DateTime, nullable=True)
     target_completion_date = Column(DateTime, nullable=True)
 
